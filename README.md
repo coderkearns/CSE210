@@ -1,2 +1,5 @@
-# CSE210
-A collection of my files from BYU-I's CSE210 class. Instructor: Brad Lythgoe
+# WDD230
+
+- **Instructor**: Brad Lythgoe
+
+Files from BYU Idaho's *CSE210: Programming with Classes* course.
