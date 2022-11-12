@@ -72,10 +72,17 @@ Week {week_number}: {assignment_name}
 
 Author: Carter Kearns
 \"""
-from .this
+# Replace "game" with the folder name, "director" with the file name.
+# See the dice-game template from week 2 for an example.
+from game.director import Director
+
+def main():
+    director = Director()
+    director.start_game()
 
 if __name__ == "__main__":
     main()
+
 """
 )
 
