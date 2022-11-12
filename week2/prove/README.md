@@ -9,7 +9,7 @@ Hilo is a game in which the player guesses if the next card drawn by the dealer 
 ```
 prove/
 ├── game/
-│   ├── <...other_files_here>
+│   ├── card.py
 │   └── director.py
 ├── __main__.py
 └── README.md
