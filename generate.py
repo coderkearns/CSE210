@@ -51,8 +51,11 @@ template_prove_readme = template(
 
 ```
 prove/
-├── README.md
-└── __main__.py
+├── game/
+│   ├── <...other_files_here>
+│   └── director.py
+├── __main__.py
+└── README.md
 ```
 
 ## Dependencies
