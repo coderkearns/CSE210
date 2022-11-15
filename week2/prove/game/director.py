@@ -30,22 +30,16 @@ class Director:
 
     def get_inputs(self):
         higher_or_lower = input("Higher or lower? [H/l] ").lower()
-        self.guessed_lower = higher_or_lower == "l"
+        self.guessed_higher = not (higher_or_lower == "l")
 
     def do_step_2(self):
         self.next_card.draw()
-        was_higher = self.first_card.is_higher_than(self.next_card)
+        was_higher = self.next_card.is_higher_than(self.first_card)
 
-        if self.guessed_lower:
-            if not was_higher:
-                self.score += 100
-            else:
-                self.score -= 75
+        if self.guessed_higher == was_higher:
+            self.score += 100
         else:
-            if was_higher:
-                self.score += 100
-            else:
-                self.score -= 75
+            self.score -= 75
 
         if self.score < 0:
             self.score = 0
