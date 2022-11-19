@@ -10,11 +10,7 @@ class Console:
 
     def output_word(self, word):
         """Output the secret word, replacing each letter that has not yet been guessed with _"""
-        letters = [
-            letter if letter in word.guessed_letters else "_"
-            for letter in word.secret_word
-        ]
-        print(" ".join(letters))
+        print(word.string_representation())
 
     def output_jumper(self, strings_left):
         """Show the parachute icon based on the number of strings left"""

@@ -62,19 +62,26 @@ WORDS = [
 
 class Word:
     def __init__(self):
-        self.secret_word = random.choice(WORDS)
+        self._secret_word = random.choice(WORDS)
 
-        self.guessed_letters = []
+        self._guessed_letters = []
         self.is_guessed = False
 
     def add_letter(self, letter):
         """Adds a letter to the list of guesses, then checks to see if the entire word has been guessed."""
-        self.guessed_letters.append(letter)
+        self._guessed_letters.append(letter)
 
         self.is_guessed = False not in [
-            letter in self.guessed_letters for letter in self.secret_word
+            letter in self._guessed_letters for letter in self._secret_word
         ]
 
     def is_correct_letter(self, letter):
         """Returns True if the given letter is in the secret word"""
-        return letter in self.secret_word
+        return letter in self._secret_word
+
+    def string_representation(self):
+        letters = [
+            letter if letter in self._guessed_letters else "_"
+            for letter in self._secret_word
+        ]
+        return " ".join(letters)
