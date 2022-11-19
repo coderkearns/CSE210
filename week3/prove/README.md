@@ -9,7 +9,10 @@ Jumper is a game in which the player seeks to solve a puzzle by guessing the let
 ```
 prove/
 ├── game/
-│   ├── <...other_files_here>
+│   ├── word.py
+│   ├── console.py
+│   ├── jumper.py
+│   ├── parachute.py
 │   └── director.py
 ├── __main__.py
 └── README.md
@@ -22,4 +25,3 @@ prove/
 ## Author
 
 Carter Kearns (coder.kearns@gmail.com)
-
