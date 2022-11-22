@@ -40,6 +40,27 @@ def generate_prepare():
     print(f"Creating file '{question_file}'")
 
 
+def generate_teach():
+    week_number = int(input("Week number? "))
+    question = input("Question? ").strip()
+
+    week_dir = Path(f"week{week_number}")
+    teach_dir = week_dir.joinpath("teach")
+
+    if not week_dir.exists():
+        week_dir.mkdir()
+        print(f"Creating directory '{week_dir}'")
+
+    if not teach_dir.exists():
+        teach_dir.mkdir()
+        print(f"Creating directory '{teach_dir}'")
+
+    question_file = teach_dir.joinpath("teach.md")
+
+    question_file.write_text(template_question(question=question))
+    print(f"Creating file '{question_file}'")
+
+
 template_prove_readme = template(
     """# {assignment_name}
 
@@ -120,11 +141,19 @@ def generate_prove():
 
 
 def main():
-    is_prove = input("(1) Prepare or (2) Prove? [1] ").strip() == "2"
-    if is_prove:
-        generate_prove()
-    else:
-        generate_prepare()
+    while True:
+        attempt = input("(1) Prepare, (2) Teach, or (3) Prove? ")
+        if attempt not in "123":
+            continue
+
+        if attempt == "1":
+            generate_prepare()
+        elif attempt == "2":
+            generate_teach()
+        elif attempt == "3":
+            generate_prove()
+
+        break
 
 
 main()
