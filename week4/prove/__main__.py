@@ -75,7 +75,7 @@ def main():
 
     # start the game
     keyboard_service = KeyboardService(CELL_SIZE)
-    video_service = VideoService(CAPTION, MAX_X, MAX_Y, CELL_SIZE, FRAME_RATE)
+    video_service = VideoService(CAPTION, MAX_X, MAX_Y, CELL_SIZE, FRAME_RATE, True)
     director = Director(keyboard_service, video_service)
     director.start_game(cast)
 

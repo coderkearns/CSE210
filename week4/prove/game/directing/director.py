@@ -58,13 +58,16 @@ class Director:
         robot = cast.get_first_actor("robots")
         collectables = cast.get_actors("collectables")
 
-        banner.set_text(f"Score: {self.score}")
         max_x = self._video_service.get_width()
         max_y = self._video_service.get_height()
+
+        banner.set_text(f"Score: {self.score}")
         robot.move_next(max_x, max_y)
 
         for collectable in collectables:
-            if robot.get_position().equals(collectable.get_position()):
+            if robot.get_position().within_y(
+                collectable.get_position(), collectable.get_velocity().get_y()
+            ):
                 self.score += collectable.score
                 # Teleport the collectable to a random new place
                 collectable.set_position(
