@@ -1,0 +1,17 @@
+@startuml mydiagram
+control Director
+actor Actor
+participant KeyboardService
+
+Director->Actor : Create
+Director->KeyboardService : Create
+
+loop until won
+    KeyboardService->Director : Input
+    Director->Actor : Move
+    Director->Director : Check Win
+end
+
+
+Director->Director : Detect Win
+@enduml
