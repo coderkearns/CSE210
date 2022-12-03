@@ -1,0 +1,5 @@
+> How did you apply polymorphism in your program's design?
+
+I again used polymorphism to allow multiple similar but separate `Actor()`-based classes. I chose not to create `Cycle1()` and `Cycle2()` class, but to instead make multiple instances of one `Cycle()` class whose init was like so: `__init__(self, player_name, player_color)`. There would also be two instances of a `Score()` class, and they would compare `player_name`s to determine which score belonged to which player. The trail elements are simple `Actor()` classes, and they did not need to store which player they belonged to because they were stored in the `Cycle()`s themselves. Each time a `Cycle()` moved, it simply creates a trail segment with the same it's same color in the previous spot.
+
+To handle the movement and collisions, I used an action/script model rather than a pure `Director()`-handled setup. Each `Action()`, or rather, `Action()`-subclass, is loaded into a `Script()` collection which can loop through and run they in their proper order.
