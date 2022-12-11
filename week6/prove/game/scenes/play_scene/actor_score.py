@@ -1,12 +1,14 @@
-from game.casting.actor import Actor
+from game.casting.message_actor import MessageActor
 
+import constants
 from game.shared.point import Point
 
+CENTER_X = int(constants.MAX_X / 2)
 
-class ScoreActor(Actor):
+
+class ScoreActor(MessageActor):
     def __init__(self):
-        super().__init__()
-        self.set_position(Point(0, 0))
+        super().__init__("Score: 0", Point(CENTER_X, 0))
 
         self._points = 0
         self.add_points(0)

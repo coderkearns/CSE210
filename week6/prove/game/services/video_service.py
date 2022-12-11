@@ -15,23 +15,23 @@ class VideoService:
         if self._debug == True:
             self._draw_grid()
 
-    def draw_actor(self, actor, centered=False):
+    def draw_actor(self, actor):
         text = actor.get_text()
         x = actor.get_position().get_x()
         y = actor.get_position().get_y()
         font_size = actor.get_font_size()
         color = actor.get_color().to_tuple()
 
-        if centered:
+        if actor.get_is_centered():
             width = pyray.measure_text(text, font_size)
             offset = int(width / 2)
             x -= offset
 
         pyray.draw_text(text, x, y, font_size, color)
 
-    def draw_actors(self, actors, centered=False):
+    def draw_actors(self, actors):
         for actor in actors:
-            self.draw_actor(actor, centered)
+            self.draw_actor(actor)
 
     def flush_buffer(self):
         pyray.end_drawing()

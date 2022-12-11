@@ -10,9 +10,7 @@ class HandleCollisionsAction(Action):
         rocks = cast.get_actors("rocks")
 
         for rock in rocks:
-            if player.get_position().vert_within(
-                rock.get_position(), constants.ROCK_FALL_SPEED * constants.CELL_SIZE
-            ):
+            if player.get_position().equals(rock.get_position()):
                 director.points = score.get_points()
                 director.current_scene.next_scene = "game_over"
                 break

@@ -11,6 +11,8 @@ class Actor:
         self._color = Color(255, 255, 255)
         self._position = Point(0, 0)
 
+        self._is_centered = False
+
     def get_color(self):
         return self._color
 
@@ -23,8 +25,8 @@ class Actor:
     def get_text(self):
         return self._text
 
-    def get_velocity(self):
-        return self._velocity
+    def get_is_centered(self):
+        return self._is_centered
 
     def set_color(self, color):
         self._color = color
@@ -38,8 +40,8 @@ class Actor:
     def set_text(self, text):
         self._text = text
 
-    def set_velocity(self, velocity):
-        self._velocity = velocity
+    def set_is_centered(self, is_centered):
+        self._is_centered = is_centered
 
     def move_next(self):
         """Changes the current position to the next postilion. Actors don't move by default."""

@@ -1,25 +1,35 @@
 from game.scenes.scene import Scene
 
 import constants
-from game.casting.actor import Actor
+from game.casting.message_actor import MessageActor
 from game.shared.point import Point
 
 from game.scripting.actions.draw_actors import DrawActorsAction
 
+CENTER_X = int(constants.MAX_X / 2)
+
 
 class GameOverScene(Scene):
     def setup(self):
-        game_over = Actor()
-        game_over.set_text("Game Over!")
-        game_over.set_position(Point(0, 0))
-        self.cast.add_actor("messages", game_over)
+        self.cast.add_actor(
+            "messages", MessageActor("Game Over!", Point(CENTER_X, 15 * 5))
+        )
+        self.cast.add_actor(
+            "messages",
+            MessageActor(
+                f"You earned {self.director.points} points!", Point(CENTER_X, 15 * 7)
+            ),
+        )
 
-        score = Actor()
-        score.set_text(f"You had {self.director.points} points!")
-        score.set_position(Point(0, 1 * constants.CELL_SIZE))
-        self.cast.add_actor("messages", score)
+        self.cast.add_actor(
+            "messages",
+            MessageActor("Press ENTER to play again!", Point(CENTER_X, 15 * 10)),
+        )
 
         self.script.add_action("output", DrawActorsAction())
 
     def tick(self):
+        if self.director.keyboard_service.is_key_down("KEY_ENTER"):
+            self.next_scene = "main"
+
         self.script.execute("output")
