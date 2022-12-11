@@ -1,5 +1,7 @@
 #!/bin/bash
 
+shopt -s globstar
+
 rm **/.DS_Store
 rm -r **/__MACOSX
 rm -rf **/__pycache__

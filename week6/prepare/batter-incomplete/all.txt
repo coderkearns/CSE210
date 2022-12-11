@@ -1,0 +1,2259 @@
+from game.casting.color import Color
+
+# --------------------------------------------------------------------------------------------------
+# GENERAL GAME CONSTANTS
+# --------------------------------------------------------------------------------------------------
+
+# GAME
+GAME_NAME = "Batter"
+FRAME_RATE = 60
+
+# SCREEN
+SCREEN_WIDTH = 1040
+SCREEN_HEIGHT = 680
+CENTER_X = SCREEN_WIDTH / 2
+CENTER_Y = SCREEN_HEIGHT / 2
+
+# FIELD
+FIELD_TOP = 60
+FIELD_BOTTOM = SCREEN_HEIGHT
+FIELD_LEFT = 0
+FIELD_RIGHT = SCREEN_WIDTH
+
+# FONT
+FONT_FILE = "batter/assets/fonts/zorque.otf"
+FONT_SMALL = 32
+FONT_LARGE = 48
+
+# SOUND
+BOUNCE_SOUND = "batter/assets/sounds/boing.wav"
+WELCOME_SOUND = "batter/assets/sounds/start.wav"
+OVER_SOUND = "batter/assets/sounds/over.wav"
+
+# TEXT
+ALIGN_CENTER = 0
+ALIGN_LEFT = 1
+ALIGN_RIGHT = 2
+
+# COLORS
+BLACK = Color(0, 0, 0)
+WHITE = Color(255, 255, 255)
+PURPLE = Color(255, 0, 255)
+
+# KEYS
+LEFT = "left"
+RIGHT = "right"
+SPACE = "space"
+ENTER = "enter"
+PAUSE = "p"
+
+# SCENES
+NEW_GAME = 0
+TRY_AGAIN = 1
+NEXT_LEVEL = 2
+IN_PLAY = 3
+GAME_OVER = 4
+
+# LEVELS
+LEVEL_FILE = "batter/assets/data/level-{:03}.txt"
+BASE_LEVELS = 5
+
+# --------------------------------------------------------------------------------------------------
+# SCRIPTING CONSTANTS
+# --------------------------------------------------------------------------------------------------
+
+# PHASES
+INITIALIZE = 0
+LOAD = 1
+INPUT = 2
+UPDATE = 3
+OUTPUT = 4
+UNLOAD = 5
+RELEASE = 6
+
+# --------------------------------------------------------------------------------------------------
+# CASTING CONSTANTS
+# --------------------------------------------------------------------------------------------------
+
+# STATS
+STATS_GROUP = "stats"
+DEFAULT_LIVES = 3
+MAXIMUM_LIVES = 5
+
+# HUD
+HUD_MARGIN = 15
+LEVEL_GROUP = "level"
+LIVES_GROUP = "lives"
+SCORE_GROUP = "score"
+LEVEL_FORMAT = "LEVEL: {}"
+LIVES_FORMAT = "LIVES: {}"
+SCORE_FORMAT = "SCORE: {}"
+
+# BALL
+BALL_GROUP = "balls"
+BALL_IMAGE = "batter/assets/images/000.png"
+BALL_WIDTH = 28
+BALL_HEIGHT = 28
+BALL_VELOCITY = 6
+
+# RACKET
+RACKET_GROUP = "rackets"
+RACKET_IMAGES = [f"batter/assets/images/{n:03}.png" for n in range(100, 103)]
+RACKET_WIDTH = 106
+RACKET_HEIGHT = 28
+RACKET_RATE = 6
+RACKET_VELOCITY = 7
+
+# BRICK
+BRICK_GROUP = "bricks"
+BRICK_IMAGES = {
+    "b": [f"batter/assets/images/{i:03}.png" for i in range(10,19)],
+    "g": [f"batter/assets/images/{i:03}.png" for i in range(20,29)],
+    "p": [f"batter/assets/images/{i:03}.png" for i in range(30,39)],
+    "y": [f"batter/assets/images/{i:03}.png" for i in range(40,49)]
+}
+BRICK_WIDTH = 80
+BRICK_HEIGHT = 28
+BRICK_DELAY = 0.5
+BRICK_RATE = 4
+BRICK_POINTS = 50
+
+# DIALOG
+DIALOG_GROUP = "dialogs"
+ENTER_TO_START = "PRESS ENTER TO START"
+PREP_TO_LAUNCH = "PREPARING TO LAUNCH"
+WAS_GOOD_GAME = "GAME OVER"from game.casting.text import Text
+
+
+class Actor:
+    """A thing that participates in the game."""
+
+    def __init__(self, debug = False):
+        """Constructs a new Actor using the given group and id.
+
+        Args:
+            group: A string containing the actor's group name.
+            id: A number that uniquely identifies the actor within the group.
+        """
+        self._debug = debug
+
+    def is_debug(self):
+        """Whether or not the actor is being debugged.
+
+        Returns:
+            True if the actor is being debugged; False if otherwise.
+        """
+        return self._debugimport time
+from constants import *
+from game.casting.image import Image
+
+
+class Animation:
+    """An animation."""
+
+    def __init__(self, images, rate = 6, delay = 0):
+        """Constructs a new Animation."""
+        self._delay = delay
+        self._images = images
+        self._rate = rate
+        self._index = 0
+        self._frame = 0
+        self._start = time.time()
+
+    def get_delay(self):
+        """Gets the delay between animation cycles.
+
+        Returns:
+            A number representing the delay in seconds.
+        """
+        return self._delay
+
+
+    def get_images(self):
+        """Gets the images that make up the animation.
+
+        Returns:
+            A list of strings containing the image names.
+        """
+        return self._images
+
+    def get_rate(self):
+        """Gets the rate of animation in frames.
+
+        Returns:
+            The rate of animation in frames.
+        """
+        return self._rate
+
+    def next_image(self):
+        """Gets the next image to display.
+
+        Returns:
+           An instance of Image.
+        """
+        filename = self._images[self._index]
+        image = Image(filename)
+        current = time.time()
+        elapsed = current - self._start
+
+        if elapsed > self._delay:
+            self._frame += 1
+
+            if self._frame >= self._rate:
+                self._index = (self._index + 1) % len(self._images)
+                self._frame = 0
+            filename = self._images[self._index]
+            image = Image(filename)
+
+            if self._index >= len(self._images) - 1:
+                self._start = current
+
+        return imageimport random
+from constants import *
+from game.casting.actor import Actor
+from game.casting.point import Point
+
+
+class Ball(Actor):
+    """A solid, spherical object that is bounced around in the game."""
+
+    def __init__(self, body, image, debug = False):
+        """Constructs a new Ball.
+
+        Args:
+            body: A new instance of Body.
+            image: A new instance of Image.
+            debug: If it is being debugged.
+        """
+        super().__init__(debug)
+        self._body = body
+        self._image = image
+
+    def bounce_x(self):
+        """Bounces the ball in the x direction."""
+        velocity = self._body.get_velocity()
+        rn = random.uniform(0.9, 1.1)
+        vx = velocity.get_x() * rn * -1
+        vy = velocity.get_y()
+        velocity = Point(vx, vy)
+        self._body.set_velocity(velocity)
+
+    def bounce_y(self):
+        """Bounces the ball in the y direction."""
+        velocity = self._body.get_velocity()
+        rn = random.uniform(0.9, 1.1)
+        vx = velocity.get_x()
+        vy = velocity.get_y() * rn * -1
+        velocity = Point(vx, vy)
+        self._body.set_velocity(velocity)
+
+    def get_body(self):
+        """Gets the ball's body.
+
+        Returns:
+            An instance of Body.
+        """
+        return self._body
+
+    def get_image(self):
+        """Gets the ball's image.
+
+        Returns:
+            An instance of Image.
+        """
+        return self._image
+
+    def release(self):
+        """Release the ball in a random direction."""
+        rn = random.uniform(0.9, 1.1)
+        vx = random.choice([-BALL_VELOCITY * rn, BALL_VELOCITY * rn])
+        vy = -BALL_VELOCITY
+        velocity = Point(vx, vy)
+        self._body.set_velocity(velocity)from game.casting.point import Point
+from game.casting.rectangle import Rectangle
+
+
+class Body:
+    """A rigid body used for physics operations."""
+
+    def __init__(self, position = Point(), size = Point(), velocity = Point()):
+        """Constructs a new Body."""
+        self._position = position
+        self._size = size
+        self._velocity = velocity
+
+    def get_position(self):
+        """Gets the body's position.
+
+        Returns:
+            An instance of Point containing the x and y coordinates.
+        """
+        return self._position
+
+    def get_size(self):
+        """Gets the body's size.
+
+        Returns:
+            An instance of Point containing the width and height.
+        """
+        return self._size
+
+    def get_velocity(self):
+        """Gets the body's velocity.
+
+        Returns:
+            An instance of Point containing the horizontal and vertical speed.
+        """
+        return self._velocity
+
+    def get_rectangle(self):
+        """Gets the rectangle enclosing the body.
+
+        Returns:
+            An instance of Rectangle.
+        """
+        return Rectangle(self._position, self._size)
+
+    def set_position(self, position):
+        """Sets the position to the given value.
+
+        Args:
+            position: An instance of Point.
+        """
+        self._position = position
+
+    def set_size(self, size):
+        """Sets the size to the given value.
+
+        Args:
+            size: An instance of Point.
+        """
+        self._size = size
+
+    def set_velocity(self, velocity):
+        """Sets the velocity to the given value.
+
+        Args:
+            velocity: An instance of Point.
+        """
+        self._velocity = velocityfrom game.casting.actor import Actor
+
+
+class Brick(Actor):
+    """A solid, rectangular object that can be broken."""
+
+    def __init__(self, body, animation, points, debug = False):
+        """Constructs a new Brick.
+
+        Args:
+            body: A new instance of Body.
+            image: A new instance of Image.
+            debug: If it is being debugged.
+        """
+        super().__init__(debug)
+        self._body = body
+        self._animation = animation
+        self._points = points
+
+    def get_animation(self):
+        """Gets the brick's image.
+
+        Returns:
+            An instance of Image.
+        """
+        return self._animation
+
+    def get_body(self):
+        """Gets the brick's body.
+
+        Returns:
+            An instance of Body.
+        """
+        return self._body
+
+    def get_points(self):
+        """Gets the brick's points.
+
+        Returns:
+            A number representing the brick's points.
+        """
+        return self._pointsclass Cast:
+    """A collection of actors."""
+
+    def __init__(self):
+        """Constructs a new Actor."""
+        self._actors = {}
+
+    def add_actor(self, group, actor):
+        """Adds an actor to the given group.
+
+        Args:
+            group: A string containing the name of the group.
+            actor: The instance of Actor (or a subclass) to add.
+        """
+        if group not in self._actors.keys():
+            self._actors[group] = []
+        self._actors[group].append(actor)
+
+    def clear_actors(self, group):
+        """Clears actors from the given group.
+
+        Args:
+            group: A string containing the name of the group.
+        """
+        if group in self._actors:
+            self._actors[group] = []
+
+    def clear_all_actors(self):
+        """Clears all actors."""
+        for group in self._actors:
+            self._actors[group] = []
+
+    def get_actors(self, group):
+        """Gets the actors in the given group.
+
+        Args:
+            group: A string containing the name of the group.
+
+        Returns:
+            A list of Actor instances.
+        """
+        results = []
+        if group in self._actors.keys():
+            results = self._actors[group].copy()
+        return results
+
+    def get_all_actors(self):
+        """Gets all of the actors in the cast.
+
+        Returns:
+            A list of actor instances.
+        """
+        results = []
+        for group in self._actors:
+            results.extend(self._actors[group])
+        return results
+
+    def get_first_actor(self, group):
+        """Gets the first actor in the given group.
+
+        Args:
+            group: A string containing the name of the group.
+
+        Returns:
+            An instance of Actor.
+        """
+        result = None
+        if group in self._actors.keys():
+            result = self._actors[group][0]
+        return result
+
+    def remove_actor(self, group, actor):
+        """Removes an actor from the given group.
+
+        Args:
+            group: A string containing the name of the group.
+            actor: The instance of Actor (or a subclass) to remove.
+        """
+        if group in self._actors:
+            self._actors[group].remove(actor)class Color:
+    """A color."""
+    def __init__(self, red, green, blue, alpha = 255):
+        """Constructs a new Color using the specified red, green, blue and alpha values. The alpha
+        value is the color's opacity.
+
+        Args:
+            red: An int between 0 and 255 representing the red value.
+            green: An int between 0 and 255 representing the green value.
+            blue: An int between 0 and 255 representing the blue value.
+            alpha: An int between 0 and 255 representing the alpha or opacity.
+        """
+        self._red = red
+        self._green = green
+        self._blue = blue
+        self._alpha = alpha
+
+    def to_tuple(self):
+        """Gets the color as a tuple of four values (red, green, blue, alpha).
+
+        Returns:
+            The color as a Tuple of four values (red, green, blue, alpha)
+        """
+        return (self._red, self._green, self._blue, self._alpha)   class Image:
+    """An image."""
+
+    def __init__(self, filename, scale = 1, rotation = 0):
+        """Constructs a new Image."""
+        self._filename = filename
+        self._scale = scale
+        self._rotation = rotation
+
+    def get_filename(self):
+        """Gets the name of the image file.
+
+        Returns:
+            A string containing the name of the image file.
+        """
+        return self._filename
+
+    def get_rotation(self):
+        """Gets the degrees the image should be rotation.
+
+        Returns:
+            A float representhing the degrees the image should be rotated.
+        """
+        return self._rotation
+
+    def get_scale(self):
+        """Gets the scaling factor for the image.
+
+        Returns:
+            A float representhing the scaling factor for the image.
+        """
+        return self._scale
+
+    def set_rotation(self, rotation):
+        """Sets the image's rotation to the given value.
+
+        Args:
+            rotation: A float representing the degree of rotation (clockwise).
+        """
+        self._rotation = rotation
+
+    def set_scale(self, scale):
+        """Sets the image's scale to the given value.
+
+        Args:
+            scale: A float representing how much the image should be scaled.
+        """
+        self._scale = scalefrom game.casting.actor import Actor
+
+
+class Label(Actor):
+    """A label to be displayed."""
+
+    def __init__(self, text, position, debug = False):
+        """Constructs a new Label.
+
+        Args:
+            text: An instance of Text.
+            position: An instance of Point.
+        """
+        super().__init__(debug)
+        self._text = text
+        self._position = position
+
+    def get_position(self):
+        """Gets the label's position.
+
+        Returns:
+            An instance of Point.
+        """
+        return self._position
+
+    def get_text(self):
+        """Gets the label's text.
+
+        Returns:
+            An instance of Text.
+        """
+        return self._text    class Point:
+    """A distance from a relative origin (0, 0)."""
+
+    def __init__(self, x = 0, y = 0):
+        """Constructs a new Point using the specified x and y values.
+
+        Args:
+            x: An int representing the horizontal distance from the origin.
+            y: An int representing the vertical distance from the origin.
+        """
+        self._x = x
+        self._y = y
+
+    def add(self, other):
+        """Gets a new point that is the sum of this and the given one.
+
+        Args:
+            other: An instance of Point.
+
+        Returns:
+            A new instance of Point containing the sum.
+        """
+        x = self._x + other.get_x()
+        y = self._y + other.get_y()
+        return Point(x, y)
+
+    def equals(self, other):
+        """Whether or not this Point is equal to the given one.
+
+        Args:
+            other: An instance of Point to compare.
+
+        Returns:
+            True if both x and y are equal; false if otherwise.
+        """
+        return self._x == other.get_x() and self._y == other.get_y()
+
+    def get_x(self):
+        """Gets the horizontal distance.
+
+        Returns:
+            An integer containing the x value or horizontal distance.
+        """
+        return self._x
+
+    def get_y(self):
+        """Gets the vertical distance.
+
+        Returns:
+            An integer containing the y value or vertical distance.
+        """
+        return self._y
+
+    def multiply(self, factor):
+        """
+        Multiplies the point by the provided factor.
+
+        Args:
+            factor: A float containing the multiplication factor.
+
+        Returns:
+            A new instance of Point.
+        """
+        return Point(self._x * factor, self._y * factor)
+
+    def reverse(self):
+        """Reverses the point by inverting both x and y values.
+
+        Returns:
+            A new instance of Point that is reversed.
+        """
+        new_x = self._x * -1
+        new_y = self._y * -1
+        return Point(new_x, new_y)from constants import *
+from game.casting.actor import Actor
+from game.casting.point import Point
+
+
+class Racket(Actor):
+    """A implement used to hit and bounce the ball in the game."""
+
+    def __init__(self, body, animation, debug = False):
+        """Constructs a new Bat.
+
+        Args:Args:
+            body: A new instance of Body.
+            animation: A new instance of Animation.
+            debug: If it is being debugged.
+        """
+        super().__init__(debug)
+        self._body = body
+        self._animation = animation
+
+    def get_animation(self):
+        """Gets the bat's animation.
+
+        Returns:
+            An instance of Animation.
+        """
+        return self._animation
+
+    def get_body(self):
+        """Gets the bat's body.
+
+        Returns:
+            An instance of Body.
+        """
+        return self._body
+
+    def move_next(self):
+        """Moves the bat using its velocity."""
+        position = self._body.get_position()
+        velocity = self._body.get_velocity()
+        new_position = position.add(velocity)
+        self._body.set_position(new_position)
+
+    def swing_left(self):
+        """Steers the bat to the left."""
+        velocity = Point(-RACKET_VELOCITY, 0)
+        self._body.set_velocity(velocity)
+
+    def swing_right(self):
+        """Steers the bat to the right."""
+        velocity = Point(RACKET_VELOCITY, 0)
+        self._body.set_velocity(velocity)
+
+    def stop_moving(self):
+        """Stops the bat from moving."""
+        velocity = Point(0, 0)
+        self._body.set_velocity(velocity)from game.casting.point import Point
+
+
+class Rectangle:
+    """A 4-sided flat shape with straight sides."""
+
+    def __init__(self, position, size):
+        """Constructs a new Rectangle."""
+        self._position = Point()
+        self._size = Point()
+
+    def get_position(self):
+        """Gets the top left point of the rectangle.
+
+        Returns:
+            An instance of Point containing the top left coordinates.
+        """
+        return self._position
+
+    def get_size(self):
+        """Gets the size of the rectangle.
+
+        Returns:
+            An instance of Point containing the width and height.
+        """
+        return self._sizeclass Sound:
+    """A sound that can be heard.
+
+    The responsibility of Sound is keep track of the audio asset information.
+    """
+
+    def __init__(self, filename, volume = 1, repeated = False):
+        """Constructs a new Sound."""
+        self._filename = filename
+        self._volume = volume
+        self._repeated = repeated
+
+    def get_filename(self):
+        """Gets the filename for the sound.
+
+        Returns:
+            A string containing the filename.
+        """
+        return self._filename
+
+    def get_volume(self):
+        """Gets the volume the sound should be played at.
+
+        Returns:
+            A number representing the volume.
+        """
+        return self._volume
+
+    def is_repeated(self):
+        """Whether or not the sound should be repeatedly played.
+
+        Returns:
+            True if the sound should be repeated; False if otherwise.
+        """
+        return self._repeatedfrom constants import *
+from game.casting.actor import Actor
+
+
+class Stats(Actor):
+    """The game stats."""
+
+    def __init__(self, debug = False):
+        """Constructs a new Stats."""
+        super().__init__(debug)
+        self._level = 1
+        self._lives = DEFAULT_LIVES
+        self._score = 0
+
+    def add_life(self):
+        """Adds one life."""
+        if self._lives < MAXIMUM_LIVES:
+            self._lives += 1
+
+    def add_points(self, points):
+        """Adds the given points to the score.
+
+        Args:
+            points: A number representing the points to add.
+        """
+        self._score += points
+
+    def get_level(self):
+        """Gets the level.
+
+        Returns:
+            A number representing the level.
+        """
+        return self._level
+
+    def get_lives(self):
+        """Gets the lives.
+
+        Returns:
+            A number representing the lives.
+        """
+        return self._lives
+
+    def get_score(self):
+        """Gets the score.
+
+        Returns:
+            A number representing the score.
+        """
+        return self._score
+
+    def lose_life(self):
+        """Removes one life."""
+        if self._lives > 0:
+            self._lives -= 1
+
+    def next_level(self):
+        """Adds one level."""
+        self._level += 1
+
+    def reset(self):
+        """Resets the stats back to their default values."""
+        self._level = 1
+        self._lives = DEFAULT_LIVES
+        self._score = 0from constants import *
+
+
+class Text:
+    """A text message."""
+
+    def __init__(self, value, fontfile = FONT_FILE, size = FONT_LARGE, alignment = ALIGN_LEFT):
+        """Constructs a new Text."""
+        self._value = value
+        self._fontfile = fontfile
+        self._size = size
+        self._alignment = alignment
+
+    def get_alignment(self):
+        """Gets the alignment for the text.
+
+        Returns:
+            A number representing the text alignment.
+        """
+        return self._alignment
+
+    def get_fontfile(self):
+        """Gets the font file for the text.
+
+        Returns:
+            A string containing the font file.
+        """
+        return self._fontfile
+
+    def get_size(self):
+        """Gets the font size of the text.
+
+        Returns:
+            A number representing the font size.
+        """
+        return self._size
+
+    def get_value(self):
+        """Gets the text's value.
+
+        Returns:
+            A string containing the text's value.
+        """
+        return self._value
+
+    def set_value(self, value):
+        """Sets the text's value.
+
+        Args:
+            A string containing the text's value.
+        """
+        self._value = valuefrom constants import *
+from game.casting.cast import Cast
+from game.directing.scene_manager import SceneManager
+from game.scripting.action_callback import ActionCallback
+from game.scripting.script import Script
+
+
+class Director(ActionCallback):
+    """A person who directs the game."""
+
+    def __init__(self, video_service):
+        """Constructs a new Director using the specified video service.
+
+        Args:
+            video_service (VideoService): An instance of VideoService.
+        """
+        self._video_service = video_service
+        self._cast = Cast()
+        self._script = Script()
+        self._scene_manager = SceneManager()
+
+    def on_next(self, scene):
+        """Overriden ActionCallback method transitions to next scene.
+
+        Args:
+            A number representing the next scene to transition to.
+        """
+        self._scene_manager.prepare_scene(scene, self._cast, self._script)
+
+    def start_game(self):
+        """Starts the game. Runs the main game loop."""
+        self.on_next(NEW_GAME)
+        self._execute_actions(INITIALIZE)
+        self._execute_actions(LOAD)
+        while self._video_service.is_window_open():
+            self._execute_actions(INPUT)
+            self._execute_actions(UPDATE)
+            self._execute_actions(OUTPUT)
+        self._execute_actions(UNLOAD)
+        self._execute_actions(RELEASE)
+
+    def _execute_actions(self, group):
+        """Calls execute for each action in the given group.
+
+        Args:
+            group (string): The action group name.
+            cast (Cast): The cast of actors.
+            script (Script): The script of actions.
+        """
+        actions = self._script.get_actions(group)
+        for action in actions:
+            action.execute(self._cast, self._script, self)          import csv
+from constants import *
+from game.casting.animation import Animation
+from game.casting.ball import Ball
+from game.casting.body import Body
+from game.casting.brick import Brick
+from game.casting.image import Image
+from game.casting.label import Label
+from game.casting.point import Point
+from game.casting.racket import Racket
+from game.casting.stats import Stats
+from game.casting.text import Text
+from game.scripting.change_scene_action import ChangeSceneAction
+from game.scripting.check_over_action import CheckOverAction
+from game.scripting.collide_borders_action import CollideBordersAction
+from game.scripting.collide_brick_action import CollideBrickAction
+from game.scripting.collide_racket_action import CollideRacketAction
+from game.scripting.control_racket_action import ControlRacketAction
+from game.scripting.draw_ball_action import DrawBallAction
+from game.scripting.draw_bricks_action import DrawBricksAction
+from game.scripting.draw_dialog_action import DrawDialogAction
+from game.scripting.draw_hud_action import DrawHudAction
+from game.scripting.draw_racket_action import DrawRacketAction
+from game.scripting.end_drawing_action import EndDrawingAction
+from game.scripting.initialize_devices_action import InitializeDevicesAction
+from game.scripting.load_assets_action import LoadAssetsAction
+from game.scripting.move_ball_action import MoveBallAction
+from game.scripting.move_racket_action import MoveRacketAction
+from game.scripting.play_sound_action import PlaySoundAction
+from game.scripting.release_devices_action import ReleaseDevicesAction
+from game.scripting.start_drawing_action import StartDrawingAction
+from game.scripting.timed_change_scene_action import TimedChangeSceneAction
+from game.scripting.unload_assets_action import UnloadAssetsAction
+from game.services.raylib.raylib_audio_service import RaylibAudioService
+from game.services.raylib.raylib_keyboard_service import RaylibKeyboardService
+from game.services.raylib.raylib_physics_service import RaylibPhysicsService
+from game.services.raylib.raylib_video_service import RaylibVideoService
+
+
+class SceneManager:
+    """The person in charge of setting up the cast and script for each scene."""
+
+    AUDIO_SERVICE = RaylibAudioService()
+    KEYBOARD_SERVICE = RaylibKeyboardService()
+    PHYSICS_SERVICE = RaylibPhysicsService()
+    VIDEO_SERVICE = RaylibVideoService(GAME_NAME, SCREEN_WIDTH, SCREEN_HEIGHT)
+
+    CHECK_OVER_ACTION = CheckOverAction()
+    COLLIDE_BORDERS_ACTION = CollideBordersAction(PHYSICS_SERVICE, AUDIO_SERVICE)
+    COLLIDE_BRICKS_ACTION = CollideBrickAction(PHYSICS_SERVICE, AUDIO_SERVICE)
+    COLLIDE_RACKET_ACTION = CollideRacketAction(PHYSICS_SERVICE, AUDIO_SERVICE)
+    CONTROL_RACKET_ACTION = ControlRacketAction(KEYBOARD_SERVICE)
+    DRAW_BALL_ACTION = DrawBallAction(VIDEO_SERVICE)
+    DRAW_BRICKS_ACTION = DrawBricksAction(VIDEO_SERVICE)
+    DRAW_DIALOG_ACTION = DrawDialogAction(VIDEO_SERVICE)
+    DRAW_HUD_ACTION = DrawHudAction(VIDEO_SERVICE)
+    DRAW_RACKET_ACTION= DrawRacketAction(VIDEO_SERVICE)
+    END_DRAWING_ACTION = EndDrawingAction(VIDEO_SERVICE)
+    INITIALIZE_DEVICES_ACTION = InitializeDevicesAction(AUDIO_SERVICE, VIDEO_SERVICE)
+    LOAD_ASSETS_ACTION = LoadAssetsAction(AUDIO_SERVICE, VIDEO_SERVICE)
+    MOVE_BALL_ACTION = MoveBallAction()
+    MOVE_RACKET_ACTION = MoveRacketAction()
+    RELEASE_DEVICES_ACTION = ReleaseDevicesAction(AUDIO_SERVICE, VIDEO_SERVICE)
+    START_DRAWING_ACTION = StartDrawingAction(VIDEO_SERVICE)
+    UNLOAD_ASSETS_ACTION = UnloadAssetsAction(AUDIO_SERVICE, VIDEO_SERVICE)
+
+    def __init__(self):
+        pass
+
+    def prepare_scene(self, scene, cast, script):
+        if scene == NEW_GAME:
+            self._prepare_new_game(cast, script)
+        elif scene == NEXT_LEVEL:
+            self._prepare_next_level(cast, script)
+        elif scene == TRY_AGAIN:
+            self._prepare_try_again(cast, script)
+        elif scene == IN_PLAY:
+            self._prepare_in_play(cast, script)
+        elif scene == GAME_OVER:
+            self._prepare_game_over(cast, script)
+
+    # ----------------------------------------------------------------------------------------------
+    # scene methods
+    # ----------------------------------------------------------------------------------------------
+
+    def _prepare_new_game(self, cast, script):
+        self._add_stats(cast)
+        self._add_level(cast)
+        self._add_lives(cast)
+        self._add_score(cast)
+        self._add_ball(cast)
+        self._add_bricks(cast)
+        self._add_racket(cast)
+        self._add_dialog(cast, ENTER_TO_START)
+
+        self._add_initialize_script(script)
+        self._add_load_script(script)
+        script.clear_actions(INPUT)
+        script.add_action(INPUT, ChangeSceneAction(self.KEYBOARD_SERVICE, NEXT_LEVEL))
+        self._add_output_script(script)
+        self._add_unload_script(script)
+        self._add_release_script(script)
+
+    def _prepare_next_level(self, cast, script):
+        self._add_ball(cast)
+        self._add_bricks(cast)
+        self._add_racket(cast)
+        self._add_dialog(cast, PREP_TO_LAUNCH)
+
+        script.clear_actions(INPUT)
+        script.add_action(INPUT, TimedChangeSceneAction(IN_PLAY, 2))
+        self._add_output_script(script)
+        script.add_action(OUTPUT, PlaySoundAction(self.AUDIO_SERVICE, WELCOME_SOUND))
+
+    def _prepare_try_again(self, cast, script):
+        self._add_ball(cast)
+        self._add_racket(cast)
+        self._add_dialog(cast, PREP_TO_LAUNCH)
+
+        script.clear_actions(INPUT)
+        script.add_action(INPUT, TimedChangeSceneAction(IN_PLAY, 2))
+        self._add_update_script(script)
+        self._add_output_script(script)
+
+    def _prepare_in_play(self, cast, script):
+        self._activate_ball(cast)
+        cast.clear_actors(DIALOG_GROUP)
+
+        script.clear_actions(INPUT)
+        script.add_action(INPUT, self.CONTROL_RACKET_ACTION)
+        self._add_update_script(script)
+        self._add_output_script(script)
+
+    def _prepare_game_over(self, cast, script):
+        self._add_ball(cast)
+        self._add_racket(cast)
+        self._add_dialog(cast, WAS_GOOD_GAME)
+
+        script.clear_actions(INPUT)
+        script.add_action(INPUT, TimedChangeSceneAction(NEW_GAME, 5))
+        script.clear_actions(UPDATE)
+        self._add_output_script(script)
+
+    # ----------------------------------------------------------------------------------------------
+    # casting methods
+    # ----------------------------------------------------------------------------------------------
+
+    def _activate_ball(self, cast):
+        ball = cast.get_first_actor(BALL_GROUP)
+        ball.release()
+
+    def _add_ball(self, cast):
+        cast.clear_actors(BALL_GROUP)
+        x = CENTER_X - BALL_WIDTH / 2
+        y = SCREEN_HEIGHT - RACKET_HEIGHT - BALL_HEIGHT
+        position = Point(x, y)
+        size = Point(BALL_WIDTH, BALL_HEIGHT)
+        velocity = Point(0, 0)
+        body = Body(position, size, velocity)
+        image = Image(BALL_IMAGE)
+        ball = Ball(body, image, True)
+        cast.add_actor(BALL_GROUP, ball)
+
+    def _add_bricks(self, cast):
+        cast.clear_actors(BRICK_GROUP)
+
+        stats = cast.get_first_actor(STATS_GROUP)
+        level = stats.get_level() % BASE_LEVELS
+        filename = LEVEL_FILE.format(level)
+
+        with open(filename, 'r') as file:
+            reader = csv.reader(file, skipinitialspace=True)
+
+            for r, row in enumerate(reader):
+                for c, column in enumerate(row):
+
+                    x = FIELD_LEFT + c * BRICK_WIDTH
+                    y = FIELD_TOP + r * BRICK_HEIGHT
+                    color = column[0]
+                    frames = int(column[1])
+                    points = BRICK_POINTS
+
+                    if frames == 1:
+                        points *= 2
+
+                    position = Point(x, y)
+                    size = Point(BRICK_WIDTH, BRICK_HEIGHT)
+                    velocity = Point(0, 0)
+                    images = BRICK_IMAGES[color][0:frames]
+
+                    body = Body(position, size, velocity)
+                    animation = Animation(images, BRICK_RATE, BRICK_DELAY)
+
+                    brick = Brick(body, animation, points)
+                    cast.add_actor(BRICK_GROUP, brick)
+
+    def _add_dialog(self, cast, message):
+        cast.clear_actors(DIALOG_GROUP)
+        text = Text(message, FONT_FILE, FONT_SMALL, ALIGN_CENTER)
+        position = Point(CENTER_X, CENTER_Y)
+        label = Label(text, position)
+        cast.add_actor(DIALOG_GROUP, label)
+
+    def _add_level(self, cast):
+        cast.clear_actors(LEVEL_GROUP)
+        text = Text(LEVEL_FORMAT, FONT_FILE, FONT_SMALL, ALIGN_LEFT)
+        position = Point(HUD_MARGIN, HUD_MARGIN)
+        label = Label(text, position)
+        cast.add_actor(LEVEL_GROUP, label)
+
+    def _add_lives(self, cast):
+        cast.clear_actors(LIVES_GROUP)
+        text = Text(LIVES_FORMAT, FONT_FILE, FONT_SMALL, ALIGN_RIGHT)
+        position = Point(SCREEN_WIDTH - HUD_MARGIN, HUD_MARGIN)
+        label = Label(text, position)
+        cast.add_actor(LIVES_GROUP, label)
+
+    def _add_score(self, cast):
+        cast.clear_actors(SCORE_GROUP)
+        text = Text(SCORE_FORMAT, FONT_FILE, FONT_SMALL, ALIGN_CENTER)
+        position = Point(CENTER_X, HUD_MARGIN)
+        label = Label(text, position)
+        cast.add_actor(SCORE_GROUP, label)
+
+    def _add_stats(self, cast):
+        cast.clear_actors(STATS_GROUP)
+        stats = Stats()
+        cast.add_actor(STATS_GROUP, stats)
+
+    def _add_racket(self, cast):
+        cast.clear_actors(RACKET_GROUP)
+        x = CENTER_X - RACKET_WIDTH / 2
+        y = SCREEN_HEIGHT - RACKET_HEIGHT
+        position = Point(x, y)
+        size = Point(RACKET_WIDTH, RACKET_HEIGHT)
+        velocity = Point(0, 0)
+        body = Body(position, size, velocity)
+        animation = Animation(RACKET_IMAGES, RACKET_RATE)
+        racket = Racket(body, animation)
+        cast.add_actor(RACKET_GROUP, racket)
+
+    # ----------------------------------------------------------------------------------------------
+    # scripting methods
+    # ----------------------------------------------------------------------------------------------
+    def _add_initialize_script(self, script):
+        script.clear_actions(INITIALIZE)
+        script.add_action(INITIALIZE, self.INITIALIZE_DEVICES_ACTION)
+
+    def _add_load_script(self, script):
+        script.clear_actions(LOAD)
+        script.add_action(LOAD, self.LOAD_ASSETS_ACTION)
+
+    def _add_output_script(self, script):
+        script.clear_actions(OUTPUT)
+        script.add_action(OUTPUT, self.START_DRAWING_ACTION)
+        script.add_action(OUTPUT, self.DRAW_HUD_ACTION)
+        script.add_action(OUTPUT, self.DRAW_BALL_ACTION)
+        script.add_action(OUTPUT, self.DRAW_BRICKS_ACTION)
+        script.add_action(OUTPUT, self.DRAW_RACKET_ACTION)
+        script.add_action(OUTPUT, self.DRAW_DIALOG_ACTION)
+        script.add_action(OUTPUT, self.END_DRAWING_ACTION)
+
+    def _add_release_script(self, script):
+        script.clear_actions(RELEASE)
+        script.add_action(RELEASE, self.RELEASE_DEVICES_ACTION)
+
+    def _add_unload_script(self, script):
+        script.clear_actions(UNLOAD)
+        script.add_action(UNLOAD, self.UNLOAD_ASSETS_ACTION)
+
+    def _add_update_script(self, script):
+        script.clear_actions(UPDATE)
+        script.add_action(UPDATE, self.MOVE_BALL_ACTION)
+        script.add_action(UPDATE, self.MOVE_RACKET_ACTION)
+        script.add_action(UPDATE, self.COLLIDE_BORDERS_ACTION)
+        script.add_action(UPDATE, self.COLLIDE_BRICKS_ACTION)
+        script.add_action(UPDATE, self.COLLIDE_RACKET_ACTION)
+        script.add_action(UPDATE, self.MOVE_RACKET_ACTION)
+        script.add_action(UPDATE, self.CHECK_OVER_ACTION)class ActionCallback:
+    """A callback that can be used to trigger scene changes."""
+
+    def on_next(self, scene):
+        """Called when we need to transition from one scene to the next.
+
+        Args:
+            scene: A number representing the next scene.
+        """
+        raise NotImplementedError("execute not implemented in base class")class Action:
+    """A thing that is done.
+
+    The responsibility of action is to do something that is important in the game. Thus, it has one
+    method, execute(), which should be overridden by derived classes.
+    """
+
+    def execute(self, cast, script, callback):
+        """Executes something that is important in the game. This method should be overriden by
+        derived classes.
+
+        Args:
+            cast: An instance of Cast containing the actors in the game.
+            script: An instance of Script containing the actions in the game.
+            callback: An instance of ActionCallback so we can change the scene.
+        """
+        raise NotImplementedError("execute not implemented in base class")from constants import *
+from game.scripting.action import Action
+
+
+class ChangeSceneAction(Action):
+
+    def __init__(self, keyboard_service, next_scene):
+        self._keyboard_service = keyboard_service
+        self._next_scene = next_scene
+
+    def execute(self, cast, script, callback):
+        if self._keyboard_service.is_key_pressed(ENTER):
+            callback.on_next(self._next_scene)from constants import *
+from game.scripting.action import Action
+
+
+class CheckOverAction(Action):
+
+    def __init__(self):
+        pass
+
+    def execute(self, cast, script, callback):
+        bricks = cast.get_actors(BRICK_GROUP)
+        if len(bricks) == 0:
+            stats = cast.get_first_actor(STATS_GROUP)
+            stats.next_level()
+            callback.on_next(NEXT_LEVEL)from constants import *
+from game.casting.sound import Sound
+from game.scripting.action import Action
+
+
+class CollideBordersAction(Action):
+
+    def __init__(self, physics_service, audio_service):
+        self._physics_service = physics_service
+        self._audio_service = audio_service
+
+    def execute(self, cast, script, callback):
+        ball = cast.get_first_actor(BALL_GROUP)
+        body = ball.get_body()
+        position = body.get_position()
+        x = position.get_x()
+        y = position.get_y()
+        bounce_sound = Sound(BOUNCE_SOUND)
+        over_sound = Sound(OVER_SOUND)
+
+        if x < FIELD_LEFT:
+            ball.bounce_x()
+            self._audio_service.play_sound(bounce_sound)
+
+        elif x >= (FIELD_RIGHT - BALL_WIDTH):
+            ball.bounce_x()
+            self._audio_service.play_sound(bounce_sound)
+
+        if y < FIELD_TOP:
+            ball.bounce_y()
+            self._audio_service.play_sound(bounce_sound)
+
+        elif y >= (FIELD_BOTTOM - BALL_WIDTH):
+            stats = cast.get_first_actor(STATS_GROUP)
+            stats.lose_life()
+
+            if stats.get_lives() > 0:
+                callback.on_next(TRY_AGAIN)
+            else:
+                callback.on_next(GAME_OVER)
+                self._audio_service.play_sound(over_sound)from constants import *
+from game.casting.sound import Sound
+from game.scripting.action import Action
+
+
+class CollideBrickAction(Action):
+
+    def __init__(self, physics_service, audio_service):
+        self._physics_service = physics_service
+        self._audio_service = audio_service
+
+    def execute(self, cast, script, callback):
+        ball = cast.get_first_actor(BALL_GROUP)
+        bricks = cast.get_actors(BRICK_GROUP)
+        stats = cast.get_first_actor(STATS_GROUP)
+
+        for brick in bricks:
+            ball_body = ball.get_body()
+            brick_body = brick.get_body()
+
+            if self._physics_service.has_collided(ball_body, brick_body):
+                ball.bounce_y()
+                sound = Sound(BOUNCE_SOUND)
+                self._audio_service.play_sound(sound)
+                points = brick.get_points()
+                stats.add_points(points)
+                cast.remove_actor(BRICK_GROUP, brick)from constants import *
+from game.casting.sound import Sound
+from game.scripting.action import Action
+
+
+class CollideRacketAction(Action):
+
+    def __init__(self, physics_service, audio_service):
+        self._physics_service = physics_service
+        self._audio_service = audio_service
+
+    def execute(self, cast, script, callback):
+        ball = cast.get_first_actor(BALL_GROUP)
+        racket = cast.get_first_actor(RACKET_GROUP)
+
+        ball_body = ball.get_body()
+        racket_body = racket.get_body()
+
+        if self._physics_service.has_collided(ball_body, racket_body):
+            ball.bounce_y()
+            sound = Sound(BOUNCE_SOUND)
+            self._audio_service.play_sound(sound)    from constants import *
+from game.scripting.action import Action
+
+
+class ControlRacketAction(Action):
+
+    def __init__(self, keyboard_service):
+        self._keyboard_service = keyboard_service
+
+    def execute(self, cast, script, callback):
+        racket = cast.get_first_actor(RACKET_GROUP)
+        if self._keyboard_service.is_key_down(LEFT):
+            racket.swing_left()
+        elif self._keyboard_service.is_key_down(RIGHT):
+            racket.swing_right()
+        else:
+            racket.stop_moving()        from constants import *
+from game.scripting.action import Action
+
+
+class DrawBallAction(Action):
+
+    def __init__(self, video_service):
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        ball = cast.get_first_actor(BALL_GROUP)
+        body = ball.get_body()
+
+        if ball.is_debug():
+            rectangle = body.get_rectangle()
+            self._video_service.draw_rectangle(rectangle, PURPLE)
+
+        image = ball.get_image()
+        position = body.get_position()
+        self._video_service.draw_image(image, position)from constants import *
+from game.scripting.action import Action
+
+
+class DrawBricksAction(Action):
+
+    def __init__(self, video_service):
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        bricks = cast.get_actors(BRICK_GROUP)
+
+        for brick in bricks:
+            body = brick.get_body()
+
+            if brick.is_debug():
+                rectangle = body.get_rectangle()
+                self._video_service.draw_rectangle(rectangle, PURPLE)
+
+            animation = brick.get_animation()
+            image = animation.next_image()
+            position = body.get_position()
+            self._video_service.draw_image(image, position)from constants import *
+from game.scripting.action import Action
+
+
+class DrawDialogAction(Action):
+
+    def __init__(self, video_service):
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        dialogs = cast.get_actors(DIALOG_GROUP)
+        for dialog in dialogs:
+            text = dialog.get_text()
+            position = dialog.get_position()
+            self._video_service.draw_text(text, position)from constants import *
+from game.scripting.action import Action
+
+
+class DrawHudAction(Action):
+
+    def __init__(self, video_service):
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        stats = cast.get_first_actor(STATS_GROUP)
+        self._draw_label(cast, LEVEL_GROUP, LEVEL_FORMAT, stats.get_level())
+        self._draw_label(cast, LIVES_GROUP, LIVES_FORMAT, stats.get_lives())
+        self._draw_label(cast, SCORE_GROUP, SCORE_FORMAT, stats.get_score())
+
+    # **********************************************************************************************
+    # You found the bug. Great job!
+    # **********************************************************************************************
+    # todo: fix the bug by making sure the text value is set to the appropriate variable.
+    def _draw_label(self, cast, group, format_str, data):
+        the_value_to_display = format_str.format(data)
+        label = cast.get_first_actor(group)
+        text = label.get_text()
+        text.set_value(the_value_to_display) # was format_str
+        position = label.get_position()
+        self._video_service.draw_text(text, position)
+from constants import *
+from game.scripting.action import Action
+
+
+class DrawRacketAction(Action):
+
+    def __init__(self, video_service):
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        racket = cast.get_first_actor(RACKET_GROUP)
+        body = racket.get_body()
+
+        if racket.is_debug():
+            rectangle = body.get_rectangle()
+            self._video_service.draw_rectangle(rectangle, PURPLE)
+
+        animation = racket.get_animation()
+        image = animation.next_image()
+        position = body.get_position()
+        self._video_service.draw_image(image, position)from game.scripting.action import Action
+
+
+class EndDrawingAction(Action):
+
+    def __init__(self, video_service):
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        self._video_service.flush_buffer()from game.scripting.action import Action
+
+
+class InitializeDevicesAction(Action):
+
+    def __init__(self, audio_service, video_service):
+        self._audio_service = audio_service
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        self._audio_service.initialize()
+        self._video_service.initialize()from game.scripting.action import Action
+
+
+class LoadAssetsAction(Action):
+
+    def __init__(self, audio_service, video_service):
+        self._audio_service = audio_service
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        self._audio_service.load_sounds("batter/assets/sounds")
+        self._video_service.load_fonts("batter/assets/fonts")
+        self._video_service.load_images("batter/assets/images")
+        from constants import *
+from game.scripting.action import Action
+
+
+class MoveBallAction(Action):
+
+    def __init__(self):
+        pass
+
+    def execute(self, cast, script, callback):
+        ball = cast.get_first_actor(BALL_GROUP)
+        body = ball.get_body()
+        position = body.get_position()
+        velocity = body.get_velocity()
+        position = position.add(velocity)
+        body.set_position(position)
+from constants import *
+from game.casting.point import Point
+from game.scripting.action import Action
+
+
+class MoveRacketAction(Action):
+
+    def __init__(self):
+        pass
+
+    def execute(self, cast, script, callback):
+        racket = cast.get_first_actor(RACKET_GROUP)
+        body = racket.get_body()
+        velocity = body.get_velocity()
+        position = body.get_position()
+        x = position.get_x()
+
+        position = position.add(velocity)
+
+        if x < 0:
+            position = Point(0, position.get_y())
+        elif x > (SCREEN_WIDTH - RACKET_WIDTH):
+            position = Point(SCREEN_WIDTH - RACKET_WIDTH, position.get_y())
+
+        body.set_position(position)
+        from constants import *
+from game.scripting.action import Action
+from game.casting.sound import Sound
+
+
+class PlaySoundAction(Action):
+
+    def __init__(self, audio_service, filename):
+        self._audio_service = audio_service
+        self._filename = filename
+
+    def execute(self, cast, script, callback):
+        sound = Sound(self._filename)
+        self._audio_service.play_sound(sound)
+        script.remove_action(OUTPUT, self)from game.scripting.action import Action
+
+
+class ReleaseDevicesAction(Action):
+
+    def __init__(self, audio_service, video_service):
+        self._audio_service = audio_service
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        self._audio_service.release()
+        self._video_service.release()from game.scripting.action import Action
+
+
+class Script:
+    """A collection of actions."""
+
+    def __init__(self):
+        """Constructs a new Action."""
+        self._actions = {}
+
+    def add_action(self, group, action):
+        """Adds an action to the given group.
+
+        Args:
+            group: A string containing the name of the group.
+            action: The instance of Action to add.
+        """
+        if group not in self._actions.keys():
+            self._actions[group] = []
+        self._actions[group].append(action)
+
+    def clear_actions(self, group):
+        """Clears actions from the given group.
+
+        Args:
+            group: A string containing the name of the group.
+        """
+        if group in self._actions.keys():
+            self._actions[group] = []
+
+    def clear_all_actions(self):
+        """Clears all actions."""
+        for group in self._actions:
+            self._actions[group] = []
+
+    def get_actions(self, group):
+        """Gets the actions in the given group.
+
+        Args:
+            group: A string containing the name of the group.
+
+        Returns:
+            A list of Action instances.
+        """
+        results = []
+        if group in self._actions.keys():
+            results = self._actions[group].copy()
+        return results
+
+    def remove_action(self, group, action):
+        """Removes an action from the given group.
+
+        Args:
+            group: A string containing the name of the group.
+            action: The instance of Action to remove.
+        """
+        if group in self._actions:
+            self._actions[group].remove(action)from game.scripting.action import Action
+
+
+class StartDrawingAction(Action):
+
+    def __init__(self, video_service):
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        self._video_service.clear_buffer()import time
+from game.scripting.action import Action
+
+
+class TimedChangeSceneAction(Action):
+
+    def __init__(self, next_scene, delay):
+        self._next_scene = next_scene
+        self._delay = delay
+        self._start = time.time()
+
+    def execute(self, cast, script, callback):
+        elapsed = time.time() - self._start
+        if elapsed >= self._delay:
+            callback.on_next(self._next_scene)from game.scripting.action import Action
+
+
+class UnloadAssetsAction(Action):
+
+    def __init__(self, audio_service, video_service):
+        self._audio_service = audio_service
+        self._video_service = video_service
+
+    def execute(self, cast, script, callback):
+        self._audio_service.unload_sounds()
+        self._video_service.unload_fonts()
+        self._video_service.unload_images()class AudioService:
+    """An audio service inteface.
+
+    The responsibility of AudioService is to handle the audio assets for a game.
+    """
+
+    def initialize(self):
+        """Initializes underlying audio device."""
+        raise NotImplementedError("not implemented in base class")
+
+    def load_sounds(self, directory):
+        """Loads all the sounds in the given directory and sub-directories.
+
+        Args:
+            directory: A string containing the absolute folder path where sound files are stored.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def play_sound(self, sound):
+        """Plays the given sound.
+
+        Args:
+            sound: An instance of the batter.casting.Sound class.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def release(self):
+        """Releases the underlying audio device."""
+        raise NotImplementedError("not implemented in base class")
+
+    def unload_sounds(self):
+        """Unloads all the sounds that were previously loaded."""
+        raise NotImplementedError("not implemented in base class")class KeyboardService:
+    """A keyboard service inteface."""
+
+    def is_key_down(self, key):
+        """Detects if the given key is being pressed.
+
+        Args:
+            key: A string containing the key value, e.g. 'a', '0', etc.
+
+        Returns:
+            True if the key is being pressed; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_key_pressed(self, key):
+        """Detects if the given key was pressed once.
+
+        Args:
+            key: A string containing the key value, e.g. 'a', '0', etc.
+
+        Returns:
+            True if the key was pressed once; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_key_released(self, key):
+        """Detects if the given key was released once.
+
+        Args:
+            key: A string containing the key value, e.g. 'a', '0', etc.
+
+        Returns:
+            True if the key was released once; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_key_up(self, key):
+        """Detects if the given key is released.
+
+        Args:
+            key: A string containing the key value, e.g. 'a', '0', etc.
+
+        Returns:
+            True if the key is released; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")class MouseService:
+    """A mouse service inteface."""
+
+    def get_coordinates(self):
+        """Gets the current mouse coordinates as a Point.
+
+        Returns:
+            Point: An instance of the batter.casting.Point class.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def has_mouse_moved(self):
+        """Whether or not the mouse has moved since the last frame.
+
+        Returns:
+            True if the mouse moved; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_button_down(self, button):
+        """Detects if the given button is pressed.
+
+        Args:
+            button: A string containing the button value, e.g. 'left', 'right' or 'middle'.
+
+        Returns:
+            True if the button is pressed; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_button_pressed(self, button):
+        """Detects if the given button was pressed once.
+
+        Args:
+            button: A string containing the button value, e.g. 'left', 'right' or 'middle'.
+
+        Returns:
+            True if the button was pressed once; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_button_released(self, button):
+        """Detects if the given button was released once.
+
+        Args:
+            button: A string containing the button value, e.g. 'left', 'right' or 'middle'.
+
+        Returns:
+            True if the button was released once; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_button_up(self, button):
+        """Detects if the given button is released.
+
+        Args:
+            button: A string containing the button value, e.g. 'left', 'right' or 'middle'.
+
+        Returns:
+            True if the button is released; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")class PhysicsService:
+    """A physics service inteface."""
+
+    def has_collided(self, subject, agent):
+        """Whether or not the given subject has collided with the given agent.
+
+        Args:
+            subject: An instance of Body.
+            agent: An instance of Body.
+
+        Returns:
+            True if the subject has collided with the agent: false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_above(self, subject, agent):
+        """Whether or not the given subject is above the given agent.
+
+        Args:
+            subject: An instance of Body.
+            agent: An instance of Body.
+
+        Returns:
+            True if the subject is above the agent: false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_below(self, subject, agent):
+        """Whether or not the given subject is below the given agent.
+
+        Args:
+            subject: An instance of Body.
+            agent: An instance of Body.
+
+        Returns:
+            True if the subject is below the agent: false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_left_of(self, subject, agent):
+        """Whether or not the given subject is to the left of the given agent.
+
+        Args:
+            subject: An instance of Body.
+            agent: An instance of Body.
+
+        Returns:
+            True if the subject is to the left of the agent: false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def is_right_of(self, subject, agent):
+        """Whether or not the given subject is to the right of the given agent.
+
+        Args:
+            subject: An instance of Body.
+            agent: An instance of Body.
+
+        Returns:
+            True if the subject is to the right of the agent: false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")import os
+import pathlib
+import pyray
+from game.services.audio_service import AudioService
+
+
+class RaylibAudioService(AudioService):
+    """A Raylib implementation of AudioService."""
+
+    def __init__(self):
+        self._sounds = {}
+
+    def initialize(self):
+        pyray.init_audio_device()
+
+    def load_sounds(self, directory):
+        filepaths = self._get_filepaths(directory, [".wav", ".mp3", ".wma", ".aac"])
+        for filepath in filepaths:
+            sound = pyray.load_sound(filepath)
+            self._sounds[filepath] = sound
+
+    def play_sound(self, sound):
+        filepath = sound.get_filename()
+        # fixed os dependent filepath
+        filepath = str(pathlib.Path(filepath))
+        volume = sound.get_volume()
+        sound = self._sounds[filepath]
+        # pyray.set_sound_volume(volume)
+        pyray.play_sound(sound)
+
+    def release(self):
+        pyray.close_audio_device()
+
+    def unload_sounds(self):
+        for sound in self._sounds.values():
+            pyray.unload_sound(sound)
+        self._sounds.clear()
+
+    def _get_filepaths(self, directory, filter):
+        filepaths = []
+        for file in os.listdir(directory):
+            filename = os.path.join(directory, file)
+            extension = pathlib.Path(filename).suffix.lower()
+            if extension in filter:
+                filename = str(pathlib.Path(filename))
+                filepaths.append(filename)
+        return filepathsimport pyray
+from game.services.keyboard_service import KeyboardService
+
+
+class RaylibKeyboardService(KeyboardService):
+    """A Raylib implementation of KeyboardService."""
+
+    def __init__(self):
+        self._keys = {}
+        self._keys["a"] = pyray.KEY_A
+        self._keys["b"] = pyray.KEY_B
+        self._keys["c"] = pyray.KEY_C
+        self._keys["d"] = pyray.KEY_D
+        self._keys["e"] = pyray.KEY_E
+        self._keys["f"] = pyray.KEY_F
+        self._keys["g"] = pyray.KEY_G
+        self._keys["h"] = pyray.KEY_H
+        self._keys["i"] = pyray.KEY_I
+        self._keys["j"] = pyray.KEY_J
+        self._keys["k"] = pyray.KEY_K
+        self._keys["l"] = pyray.KEY_L
+        self._keys["m"] = pyray.KEY_M
+        self._keys["n"] = pyray.KEY_N
+        self._keys["o"] = pyray.KEY_O
+        self._keys["p"] = pyray.KEY_P
+        self._keys["q"] = pyray.KEY_Q
+        self._keys["r"] = pyray.KEY_R
+        self._keys["s"] = pyray.KEY_S
+        self._keys["t"] = pyray.KEY_T
+        self._keys["u"] = pyray.KEY_U
+        self._keys["v"] = pyray.KEY_V
+        self._keys["w"] = pyray.KEY_W
+        self._keys["x"] = pyray.KEY_X
+        self._keys["y"] = pyray.KEY_Y
+        self._keys["z"] = pyray.KEY_Z
+        self._keys["0"] = pyray.KEY_ZERO
+        self._keys["1"] = pyray.KEY_ONE
+        self._keys["2"] = pyray.KEY_TWO
+        self._keys["3"] = pyray.KEY_THREE
+        self._keys["4"] = pyray.KEY_FOUR
+        self._keys["5"] = pyray.KEY_FIVE
+        self._keys["6"] = pyray.KEY_SIX
+        self._keys["7"] = pyray.KEY_SEVEN
+        self._keys["8"] = pyray.KEY_EIGHT
+        self._keys["9"] = pyray.KEY_NINE
+        self._keys["left"] = pyray.KEY_LEFT
+        self._keys["right"] = pyray.KEY_RIGHT
+        self._keys["up"] = pyray.KEY_UP
+        self._keys["down"] = pyray.KEY_DOWN
+        self._keys["enter"] = pyray.KEY_ENTER
+        self._keys["space"] = pyray.KEY_SPACE
+
+    def is_key_down(self, key):
+        raylib_key = self._keys[key.lower()]
+        return pyray.is_key_down(raylib_key)
+
+    def is_key_pressed(self, key):
+        raylib_key = self._keys[key.lower()]
+        return pyray.is_key_pressed(raylib_key)
+
+    def is_key_released(self, key):
+        raylib_key = self._keys[key.lower()]
+        return pyray.is_key_released(raylib_key)
+
+    def is_key_up(self, key):
+        raylib_key = self._keys[key.lower()]
+        return pyray.is_key_up(raylib_key)import pyray
+from game.casting.point import Point
+from game.services.mouse_service import MouseService
+
+
+class RaylibMouseService(MouseService):
+    """ A Raylib implementation of MouseService."""
+
+    def __init__(self):
+        self._buttons = {}
+        self._buttons["left"] = pyray.MOUSE_BUTTON_LEFT
+        self._buttons["middle"] = pyray.MOUSE_BUTTON_MIDDLE
+        self._buttons["right"] = pyray.MOUSE_BUTTON_RIGHT
+
+    def get_coordinates(self):
+        x = pyray.get_mouse_x()
+        y = pyray.get_mouse_y()
+        return Point(x, y)
+
+    def has_mouse_moved(self):
+        mouse_delta = pyray.get_mouse_delta()
+        return mouse_delta.x > 0 or mouse_delta.y > 0
+
+    def is_button_down(self, button):
+        raylib_button = self._buttons[button]
+        return pyray.is_mouse_button_down(raylib_button)
+
+    def is_button_pressed(self, button):
+        raylib_button = self._buttons[button]
+        return pyray.is_mouse_button_pressed(raylib_button)
+
+    def is_button_released(self, button):
+        raylib_button = self._buttons[button]
+        return pyray.is_mouse_button_released(raylib_button)
+
+    def is_button_up(self, button):
+        raylib_button = self._buttons[button]
+        return pyray.is_mouse_button_up(raylib_button)import pyray
+from game.services.physics_service import PhysicsService
+
+
+class RaylibPhysicsService(PhysicsService):
+    """ A Raylib implementation of PhysicsService."""
+    def __init__(self):
+        pass
+
+    def has_collided(self, subject, agent):
+        subject_rectangle = self._get_rectangle(subject)
+        agent_rectangle = self._get_rectangle(agent)
+        return pyray.check_collision_recs(subject_rectangle, agent_rectangle)
+
+    def is_above(self, subject, agent):
+        subject_rectangle = self._get_rectangle(subject)
+        agent_rectangle = self._get_rectangle(agent)
+        collision_rectangle = pyray.get_collision_rec(subject_rectangle, agent_rectangle)
+        subject_rectangle_bottom = subject_rectangle.y + subject_rectangle.height
+        collision_rectangle_bottom = collision_rectangle.y + collision_rectangle.height
+        return subject_rectangle_bottom == collision_rectangle_bottom
+
+    def is_below(self, subject, agent):
+        subject_rectangle = self._get_rectangle(subject)
+        agent_rectangle = self._get_rectangle(agent)
+        collision_rectangle = pyray.get_collision_rec(subject_rectangle, agent_rectangle)
+        subject_rectangle_top = subject_rectangle.y
+        collision_rectangle_top = collision_rectangle.y
+        return subject_rectangle_top == collision_rectangle_top
+
+    def is_left_of(self, subject, agent):
+        subject_rectangle = self._get_rectangle(subject)
+        agent_rectangle = self._get_rectangle(agent)
+        collision_rectangle = pyray.get_collision_rec(subject_rectangle, agent_rectangle)
+        subject_rectangle_right = subject_rectangle.x + subject_rectangle.width
+        collision_rectangle_right = collision_rectangle.x + collision_rectangle.width
+        return subject_rectangle_right == collision_rectangle_right
+
+    def is_right_of(self, subject, agent):
+        subject_rectangle = self._get_rectangle(subject)
+        agent_rectangle = self._get_rectangle(agent)
+        collision_rectangle = pyray.get_collision_rec(subject_rectangle, agent_rectangle)
+        subject_rectangle_left = subject_rectangle.x
+        collision_rectangle_left = collision_rectangle.x
+        return subject_rectangle_left == collision_rectangle_left
+
+    def _get_rectangle(self, body):
+        top = body.get_position().get_y()
+        left = body.get_position().get_x()
+        width = body.get_size().get_x()
+        height = body.get_size().get_y()
+        return pyray.Rectangle(left, top, width, height)import os
+import pathlib
+import pyray
+from constants import *
+from game.casting.color import Color
+from game.casting.text import Text
+from game.services.video_service import VideoService
+
+
+class RaylibVideoService(VideoService):
+    """ A Raylib implementation of VideoService."""
+
+    def __init__(self, title = "", width = 640, height = 480, color = BLACK):
+        self._title = title
+        self._width = width
+        self._height = height
+        self._color = color
+        self._fonts = {}
+        self._textures = {}
+
+    def clear_buffer(self):
+        raylib_color = self._to_raylib_color(self._color)
+        pyray.begin_drawing()
+        pyray.clear_background(raylib_color)
+
+    def draw_image(self, image, position):
+        filepath = image.get_filename()
+        # fixed os dependent filepath
+        filepath = str(pathlib.Path(filepath))
+        texture = self._textures[filepath]
+        x = position.get_x()
+        y = position.get_y()
+        raylib_position = pyray.Vector2(x, y)
+        scale = image.get_scale()
+        rotation = image.get_rotation()
+        tint = self._to_raylib_color(Color(255,255,255))
+        pyray.draw_texture_ex(texture, raylib_position, rotation, scale, tint)
+
+    def draw_rectangle(self, rectangle, color, filled = False):
+        x = int(rectangle.get_position().get_x())
+        y = int(rectangle.get_position().get_y())
+        width = int(rectangle.get_size().get_x())
+        height = int(rectangle.get_size().get_y())
+        raylib_color = self._to_raylib_color(color)
+
+        if filled:
+            pyray.draw_rectangle(x, y, width, height, raylib_color)
+        else:
+            pyray.draw_rectangle_lines(x, y, width, height, raylib_color)
+
+    def draw_text(self, text, position):
+        filepath = text.get_fontfile()
+        # fixed os dependent filepath
+        filepath = str(pathlib.Path(filepath))
+        value = text.get_value()
+        size = text.get_size()
+        spacing = 0
+        alignment = text.get_alignment()
+        tint = self._to_raylib_color(Color(255, 255, 255))
+
+        font = self._fonts[filepath]
+        text_image = pyray.image_text_ex(font, value, size, spacing, tint)
+
+        x = position.get_x()
+        y = position.get_y()
+
+        if alignment == ALIGN_CENTER:
+            x = (position.get_x() - text_image.width / 2)
+            # y = (position.get_y() - text_image.height / 2)
+        elif alignment == ALIGN_RIGHT:
+            x = (position.get_x() - text_image.width)
+
+        raylib_position = pyray.Vector2(x, y)
+        pyray.draw_text_ex(font, value, raylib_position, size, spacing, tint)
+
+    def flush_buffer(self):
+        pyray.end_drawing()
+
+    def initialize(self):
+        pyray.set_target_fps(60)
+        pyray.init_window(self._width, self._height, self._title)
+
+    def is_window_open(self):
+        return not pyray.window_should_close()
+
+    def load_fonts(self, directory):
+        filepaths = self._get_filepaths(directory, [".otf", ".ttf"])
+        for filepath in filepaths:
+            if filepath not in self._fonts.keys():
+                font = pyray.load_font(filepath)
+                self._fonts[filepath] = font
+
+    def load_images(self, directory):
+        filepaths = self._get_filepaths(directory, [".png", ".gif", ".jpg", ".jpeg", ".bmp"])
+        for filepath in filepaths:
+            if filepath not in self._textures.keys():
+                texture = pyray.load_texture(filepath)
+                self._textures[filepath] = texture
+
+    def release(self):
+        pyray.close_window()
+
+    def unload_fonts(self):
+        for font in self._fonts.values():
+            pyray.unload_font(font)
+        self._fonts.clear()
+
+    def unload_images(self):
+        for texture in self._textures.values():
+            pyray.unload_texture(texture)
+        self._textures.clear()
+
+    def _get_filepaths(self, directory, filter):
+        filepaths = []
+        for file in os.listdir(directory):
+            filename = os.path.join(directory, file)
+            extension = pathlib.Path(filename).suffix.lower()
+            if extension in filter:
+                filename = str(pathlib.Path(filename))
+                filepaths.append(filename)
+        return filepaths
+
+    def _to_raylib_color(self, color):
+        r, g, b, a = color.to_tuple()
+        return pyray.Color(r, g, b, a)class VideoService:
+    """A video service inteface."""
+
+    def clear_buffer(self):
+        """Prepares the buffer for drawing."""
+        raise NotImplementedError("not implemented in base class")
+
+    def draw_image(self, image, position):
+        """Draws the given image on the buffer at the given position. The image won't appear
+        on the screen until flush_buffer() is called.
+
+        Args:
+            image: An instance of batter.casting.image.
+            position: An instance of batter.casting.point.
+
+        Raises:
+            KeyError: If the image file hasn't already been loaded.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def draw_rectangle(self, size, position, color):
+        """Draws a rectangle on the buffer at the given position. The rectangle won't appear
+        on the screen until flush_buffer() is called.
+
+        Args:
+            size: An instance of batter.casting.point.
+            position: An instance of batter.casting.point.
+            color: An instance of batter.casting.color.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def draw_text(self, text, position):
+        """Draws the given text on the buffer at the given position. The text won't appear
+        on the screen until flush_buffer() is called.
+
+        Args:
+            text: An instance of batter.casting.text.
+            position: An instance of batter.casting.point.
+
+        Raises:
+            KeyError: If the font file for the text hasn't already been loaded.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def flush_buffer(self):
+        """Swaps the buffers, displaying everything that has been drawn on the screen."""
+        raise NotImplementedError("not implemented in base class")
+
+    def initialize(self):
+        """Initializes underlying video device. This method should be called before the main game
+        loop begins."""
+        raise NotImplementedError("not implemented in base class")
+
+    def is_window_open(self):
+        """Wether or not the window is open.
+
+        Returns:
+            True if the window is open; false if otherwise.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def load_fonts(self, directory):
+        """Loads all the fonts in the given directory and sub-directories.
+
+        Args:
+            directory: A string containing the absolute folder path where font files are stored.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def load_images(self, directory):
+        """Loads all the images in the given directory and sub-directories.
+
+        Args:
+            directory: A string containing the absolute folder path where image files are stored.
+        """
+        raise NotImplementedError("not implemented in base class")
+
+    def release(self):
+        """Releases the underlying video device. This method should be called after the game loop
+        has finished running."""
+        raise NotImplementedError("not implemented in base class")
+
+    def unload_fonts(self):
+        """Unloads all fonts that were previously loaded."""
+        raise NotImplementedError("not implemented in base class")
+
+    def unload_images(self):
+        """Unloads all images that were previously loaded."""
+        raise NotImplementedError("not implemented in base class")from constants import *
+from game.directing.director import Director
+from game.directing.scene_manager import SceneManager
+
+
+def main():
+    director = Director(SceneManager.VIDEO_SERVICE)
+    director.start_game()
+
+if __name__ == "__main__":
+    main()
