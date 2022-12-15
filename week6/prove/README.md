@@ -6,8 +6,9 @@ Rock Dodge is a game where you attempt to avoid randomly falling rocks and attem
 
 ## Example Playthrough
 
-![Example Playthrough](./example_playthrough.webm)
+[example_playthrough.webm](https://user-images.githubusercontent.com/80931347/207765527-8fcd58ae-e089-4a3a-9fc5-221b0750e7ba.webm)
 *./example_playthrough.webm*
+
 ## Project Structure
 
 ```
