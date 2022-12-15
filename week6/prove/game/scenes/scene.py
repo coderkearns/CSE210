@@ -21,6 +21,6 @@ class Scene:
         self.script.execute("output")
 
     def run(self):
-        while self.next_scene is None:
+        while self.next_scene is None and self.director.video_service.is_window_open():
             self.tick()
         return self.next_scene
