@@ -4,6 +4,10 @@
 
 Rock Dodge is a game where you attempt to avoid randomly falling rocks and attempt to survive as long s possible.
 
+## Example Playthrough
+
+![Example Playthrough](./example_playthrough.webm)
+*./example_playthrough.webm*
 ## Project Structure
 
 ```
@@ -43,6 +47,7 @@ prove/
 │       └── point.py
 ├── constants.py
 ├── __main__.py
+├── example_playthrough.webm
 └── README.md
 ```
 
